@@ -1,6 +1,6 @@
 /**
  * PROJECT AI 〜人類最後のアップデートが始まる〜
- * js/staff.js - 付き添いスタッフスマホ専用UI制御 (アサイン確定3問のみ表示版)
+ * js/staff.js - 付き添いスタッフスマホ専用UI制御 (高速同期・完全一致表示版)
  */
 
 const StaffApp = {
@@ -8,7 +8,7 @@ const StaffApp = {
   currentStaffName: '',
   currentGroupName: '',
   selectedDifficulty: 'normal',
-  assignedQuestions: [], // 入口で確定した3問
+  assignedQuestions: [],
   isCheatsVisible: false,
   pollingTimer: null,
 
@@ -97,24 +97,20 @@ const StaffApp = {
       this.generateQRCode();
     }, 50);
 
-    // 入口で確定した3問をロード & 定期同期開始
     this.loadAssignedQuestions();
     this.startAssignedPolling();
   },
 
   startAssignedPolling() {
     if (this.pollingTimer) clearInterval(this.pollingTimer);
-    // 割り当て問題がまだ0件の場合は5秒ごとに確認
+    // 3問取得できるまで3秒間隔で高速ポーリング
     this.pollingTimer = setInterval(() => {
       if (this.assignedQuestions.length < 3) {
         this.loadAssignedQuestions(true);
       }
-    }, 5000);
+    }, 3000);
   },
 
-  /**
-   * サーバーからこのグループ専用に確定された3問を取得
-   */
   async loadAssignedQuestions(silent = false) {
     try {
       const res = await API.getAssignedQuestions(this.deviceId);
@@ -145,7 +141,7 @@ const StaffApp = {
         return `<div class="text-muted py-1" style="font-size:12px;">第${roomNum}問: 未確定</div>`;
       }
       const hintsHtml = (q.hints && q.hints.length > 0)
-        ? `<div class="cheat-exp"><strong>ヒント:</strong> ${q.hints.join(' / ')}</div>`
+        ? `<div class="cheat-exp" style="margin-top:4px;"><strong>ヒント:</strong> ${q.hints.join(' / ')}</div>`
         : '';
 
       return `
@@ -155,9 +151,9 @@ const StaffApp = {
             <span class="font-cyber font-bold text-highlight">[${String(q.difficulty || '').toUpperCase()}]</span>
           </div>
           <p class="cheat-qtext mt-1"><strong>問題:</strong> ${q.question_text || ''}</p>
-          <div class="cheat-ans-box mt-1">
+          <div class="cheat-ans-box mt-1" style="background: rgba(0,240,255,0.08); padding: 4px 8px; border-radius: 4px;">
             <span class="cheat-label">正解:</span>
-            <strong class="text-success font-mono font-bold" style="font-size:15px;">${q.answer || '--'}</strong>
+            <strong class="text-success font-mono font-bold" style="font-size:16px;">${q.answer || '--'}</strong>
           </div>
           ${hintsHtml}
           ${q.explanation ? `<div class="cheat-exp mt-1"><span class="cheat-label">解説:</span> ${q.explanation}</div>` : ''}
@@ -176,8 +172,8 @@ const StaffApp = {
 
   renderPendingCheats() {
     const msg = `
-      <div class="text-center py-2 text-warning" style="font-size:12px;">
-        <span class="material-symbols-outlined icon-xs">info</span> 入口受付後に、このグループの3問が確定して表示されます
+      <div class="text-center py-2 text-warning font-cyber" style="font-size:12px;">
+        <span class="material-symbols-outlined icon-xs" style="vertical-align:middle;">info</span> 入口機でQR受付を行うと、出題される3問が確定します
       </div>
     `;
     const r1 = document.getElementById('cheat-list-room1');
@@ -222,17 +218,8 @@ const StaffApp = {
           colorLight: '#ffffff',
           correctLevel: QRCode.CorrectLevel.M
         });
-
-        setTimeout(() => {
-          const hasGraphic = container.querySelector('canvas') || container.querySelector('img');
-          if (!hasGraphic) {
-            this.generateQRCodeFallbackAPI(container, rawJson, payload);
-          }
-        }, 150);
         return;
-      } catch (err) {
-        console.warn('[StaffApp] QRCode.js 生成失敗:', err);
-      }
+      } catch (err) {}
     }
 
     this.generateQRCodeFallbackAPI(container, rawJson, payload);
@@ -255,42 +242,17 @@ const StaffApp = {
     };
 
     img.onerror = () => {
-      const backupUrl = `https://quickchart.io/qr?size=220&text=${encodedData}`;
-      const backupImg = new Image();
-      backupImg.style.width = '220px';
-      backupImg.style.height = '220px';
-      backupImg.style.display = 'block';
-
-      backupImg.onload = () => {
-        container.innerHTML = '';
-        container.appendChild(backupImg);
-      };
-
-      backupImg.onerror = () => {
-        this.renderEmergencyFallbackText(container, payload);
-      };
-
-      backupImg.src = backupUrl;
+      container.innerHTML = `
+        <div class="qr-fallback-emergency">
+          <div class="qr-fallback-title">OFFLINE AUTH CODE</div>
+          <div class="qr-fallback-dev">${payload.device_id}</div>
+          <div class="qr-fallback-group">${payload.group_name}</div>
+          <div class="qr-fallback-diff">[${String(payload.difficulty).toUpperCase()}]</div>
+        </div>
+      `;
     };
 
     img.src = apiUrl;
-  },
-
-  renderEmergencyFallbackText(container, payload) {
-    container.innerHTML = `
-      <div class="qr-fallback-emergency">
-        <div class="qr-fallback-title">OFFLINE AUTH CODE</div>
-        <div class="qr-fallback-dev">${payload.device_id}</div>
-        <div class="qr-fallback-group">${payload.group_name}</div>
-        <div class="qr-fallback-diff">[${String(payload.difficulty).toUpperCase()}]</div>
-        <p style="font-size:10px; color:#94a3b8; margin-top:6px; line-height:1.2;">
-          ※QR生成サーバーに接続できません<br>各ブースで手動登録してください
-        </p>
-        <button type="button" class="qr-fallback-retry-btn" onclick="StaffApp.generateQRCode()">
-          再試行
-        </button>
-      </div>
-    `;
   },
 
   renderSetupView() {
@@ -323,8 +285,8 @@ const StaffApp = {
     if (label) label.textContent = this.isCheatsVisible ? '答えを隠す' : '答えを表示';
     if (btn) btn.classList.toggle('btn-warning', this.isCheatsVisible);
 
-    // 開いたタイミングで最新の問題を再取得
-    if (this.isCheatsVisible && this.assignedQuestions.length < 3) {
+    // チートシートを開いた瞬間に最新の割り当て問題を同期取得
+    if (this.isCheatsVisible) {
       this.loadAssignedQuestions();
     }
   }

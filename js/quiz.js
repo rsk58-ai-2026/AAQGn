@@ -1,6 +1,6 @@
 /**
  * PROJECT AI 〜人類最後のアップデートが始まる〜
- * js/quiz.js - 問題機ブース端末 (第1問〜第3問) 制御 (難易度同期修正版)
+ * js/quiz.js - 問題機ブース端末 (第1問〜第3問) 制御 (完全一致出題版)
  */
 
 const QuizApp = {
@@ -50,7 +50,7 @@ const QuizApp = {
         };
       }
     } catch (e) {
-      console.warn('[QuizApp] ルール取得スキップ (デフォルト適用):', e);
+      console.warn('[QuizApp] ルール取得スキップ:', e);
     }
   },
 
@@ -74,10 +74,6 @@ const QuizApp = {
     });
   },
 
-  /**
-   * 出題開始
-   * @param {Object} qrData { device_id, group_name, staff_name, difficulty, is_ex_entry }
-   */
   async handleStartQuiz(qrData) {
     if (!qrData || !qrData.device_id) {
       alert('無効なスタッフQRコードです。');
@@ -85,13 +81,12 @@ const QuizApp = {
     }
 
     this.activeDeviceId = qrData.device_id;
-    const targetDifficulty = qrData.difficulty || 'normal';
 
     try {
       const res = await API.startQuizRoom({
         booth_id: this.roomKey,
         device_id: this.activeDeviceId,
-        difficulty: targetDifficulty
+        difficulty: qrData.difficulty || 'normal'
       });
 
       if (res && res.success && res.question) {
@@ -108,9 +103,8 @@ const QuizApp = {
           };
         }
 
-        // 実際に出題された難易度（サーバー返却値優先）で画面描画
-        const appliedDiff = res.question.difficulty || (res.group && res.group.difficulty) || targetDifficulty;
-        this.startPlay(appliedDiff);
+        // サーバーから返却された確定問題をそのまま開始
+        this.startPlay(res.question.difficulty || 'normal');
       } else {
         alert('出題開始エラー: ' + (res.error || 'グループが特定できません'));
       }
@@ -308,7 +302,7 @@ const QuizApp = {
         miss_count: 0
       });
     } catch (e) {
-      console.warn('[QuizApp] 解答送信エラー (待機画面へ復帰):', e);
+      console.warn('[QuizApp] 解答送信エラー:', e);
     }
 
     this.resetToIdle();
