@@ -1,6 +1,6 @@
 /**
  * PROJECT AI 〜人類最後のアップデートが始まる〜
- * js/api.js - 通信レイヤー (リトライ・指数バックオフ・難易度連動修正版)
+ * js/api.js - 通信レイヤー (事前アサイン対応版)
  */
 const API = {
   async fetchWithRetry(url, options = {}, maxRetries = 3) {
@@ -87,12 +87,18 @@ const API = {
   },
 
   // ==========================================
-  // 2. クイズ問題機 (Room 1〜3) API
+  // 2. スタッフスマホ用 割り当て問題取得 API
   // ==========================================
-  /**
-   * スタッフQRをスキャンして出題開始
-   * @param {Object} payload { booth_id, device_id, difficulty }
-   */
+  async getAssignedQuestions(deviceId) {
+    return await this.get({
+      action: 'getAssignedQuestions',
+      device_id: deviceId
+    });
+  },
+
+  // ==========================================
+  // 3. クイズ問題機 (Room 1〜3) API
+  // ==========================================
   async startQuizRoom(payload) {
     return await this.post({
       action: 'startQuizRoom',
@@ -110,7 +116,7 @@ const API = {
   },
 
   // ==========================================
-  // 3. 射撃フェーズ機 (Shooting) API
+  // 4. 射撃フェーズ機 (Shooting) API
   // ==========================================
   async submitShootingScore(payload) {
     return await this.post({
@@ -120,7 +126,7 @@ const API = {
   },
 
   // ==========================================
-  // 4. 出口／リザルト機 (Exit) API
+  // 5. 出口／リザルト機 (Exit) API
   // ==========================================
   async getGroupSummaryAndRelease(payload) {
     return await this.post({
@@ -150,7 +156,7 @@ const API = {
   },
 
   // ==========================================
-  // 5. 共通マスタ・参照 API
+  // 6. 共通マスタ・参照 API
   // ==========================================
   async getQuestions(room = '', difficulty = '') {
     const params = { action: 'getQuestions' };
@@ -170,7 +176,7 @@ const API = {
   },
 
   // ==========================================
-  // 6. 管理者／システム制御 API
+  // 7. 管理者／システム制御 API
   // ==========================================
   async saveSystemRules(rules) {
     return await this.post({
