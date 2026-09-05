@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PROJECT AI 〜人類最後のアップデートが始まる〜 | 運営システム</title>
+  
+  <!-- Webフォント -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700;900&family=Noto+Sans+JP:wght@400;500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  
+  <!-- 外部ライブラリ: QRコード生成 (CDN二重化フォールバック) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <!-- 外部ライブラリ: カメラQRコード読取 -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  
+  <!-- メインスタイルシート -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="cyber-bg">
+
+  <!-- ====================================================================== -->
+  <!-- 0. 共通モーダル群                                                      -->
+  <!-- ====================================================================== -->
+
+  <!-- 0-A. インカメラ QRスキャナーモーダル -->
+  <div id="camera-scan-modal" class="modal-overlay hidden">
+    <div class="card scan-modal-card cyber-border-accent">
+      <div class="modal-header">
+        <div class="modal-title-box">
+          <span class="material-symbols-outlined icon-md icon-accent">qr_code_scanner</span>
+          <h3 class="modal-title font-cyber">AUTHENTICATION // QR SCAN</h3>
+        </div>
+        <button type="button" class="btn-icon-close" onclick="CameraScanner.close()">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <p class="scan-modal-guide">スタッフスマホのQRコードを画面内にかざしてください</p>
+
+      <div class="scanner-viewport-wrapper">
+        <div id="camera-reader-viewport" class="scanner-viewport"></div>
+        <div class="scanner-laser-line"></div>
+        <div class="scanner-corner-frame"></div>
+      </div>
+
+      <div class="scanner-actions">
+        <button type="button" class="btn btn-secondary btn-sm font-cyber" onclick="CameraScanner.toggleCameraFacing()">
+          <span class="material-symbols-outlined icon-sm">cameraswitch</span> カメラ切替
+        </button>
+        <button type="button" class="btn btn-danger btn-sm font-cyber" onclick="CameraScanner.close()">
+          <span class="material-symbols-outlined icon-sm">cancel</span> キャンセル
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 0-B. スタッフ用詳細マニュアル & カンニングDB モーダル -->
+  <div id="manual-modal" class="modal-overlay hidden">
+    <div class="card manual-card cyber-border">
+      <div class="manual-header">
+        <div class="manual-title-box">
+          <span class="material-symbols-outlined icon-md icon-accent">terminal</span>
+          <h2 class="manual-title font-cyber">STAFF OPERATION TERMINAL // MANUAL</h2>
+        </div>
+        <button type="button" class="btn-icon-close" onclick="ManualModal.close()">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <div class="manual-tab-nav">
+        <button type="button" id="tab-btn-flow" class="manual-tab-btn active font-cyber" onclick="ManualModal.switchTab('flow')">
+          <span class="material-symbols-outlined icon-sm">account_tree</span> 進行フロー
+        </button>
+        <button type="button" id="tab-btn-db" class="manual-tab-btn font-cyber" onclick="ManualModal.switchTab('db')">
+          <span class="material-symbols-outlined icon-sm">quiz</span> 全問カンニングDB
+        </button>
+      </div>
+
+      <div class="manual-body">
+        <!-- フロー説明 -->
+        <div id="manual-content-flow" class="manual-tab-content">
+          <div class="flow-step-block">
+            <h3 class="flow-heading"><span class="step-num">01</span> 【スタッフスマホ】QR発行 & 入口受付</h3>
+            <p class="flow-text">
+              1. スマホで端末ID・スタッフ名・グループ名を入力し<strong>「QRコードを発行」</strong>を押します。<br>
+              2. 入口機iPadの「QR受付」ボタンを押し、スマホのQRをかざしてグループを登録します。
+            </p>
+          </div>
+
+          <div class="flow-step-block">
+            <h3 class="flow-heading"><span class="step-num">02</span> 【第1問〜第3問】各部屋でQRスキャン & 出題</h3>
+            <p class="flow-text">
+              1. 各ブースiPadの「QRコードをスキャンして開始」をタップ。<br>
+              2. スタッフスマホのQRをかざすと即座に出題が始まります。<br>
+              3. お客様が回答したら、スタッフがiPad上の判定ボタン（⭕正解 / ❌誤答）を押して確定します。
+            </p>
+          </div>
+
+          <div class="flow-step-block">
+            <h3 class="flow-heading"><span class="step-num">03</span> 【射撃フェーズ】得点入力 & QR登録</h3>
+            <p class="flow-text">
+              1. 射撃機の画面テンキーで獲得した得点を入力します。<br>
+              2. 「QRコードをスキャンして得点登録」を押し、スマホQRをかざして記録を完了させます。
+            </p>
+          </div>
+
+          <div class="flow-step-block">
+            <h3 class="flow-heading"><span class="step-num">04</span> 【出口】成績発表 & 端末リセット</h3>
+            <p class="flow-text">
+              1. 出口機iPadの「QRコードをスキャンして成績発表」をタップし、スマホQRをかざします。<br>
+              2. 総合スコア・詳細解説が一覧の先頭に発表され、条件達成者にはEX合言葉「しらす」が表示されます。<br>
+              3. スキャン完了と同時にスマホの紐付けが解除され、次のグループ受付が可能になります。
+            </p>
+          </div>
+        </div>
+
+        <!-- カンニングDB -->
+        <div id="manual-content-db" class="manual-tab-content hidden">
+          <div class="db-control-container">
+            <div class="db-filter-bar">
+              <button type="button" class="db-filter-chip active" onclick="ManualModal.filterQuestions('all')">全問</button>
+              <button type="button" class="db-filter-chip" onclick="ManualModal.filterQuestions('1')">第1問</button>
+              <button type="button" class="db-filter-chip" onclick="ManualModal.filterQuestions('2')">第2問</button>
+              <button type="button" class="db-filter-chip" onclick="ManualModal.filterQuestions('3')">第3問</button>
+              <button type="button" class="db-filter-chip" onclick="ManualModal.filterQuestions('ex')">EX問題</button>
+            </div>
+          </div>
+          <div id="manual-questions-list" class="db-cards-container">
+            <div class="text-center text-muted py-4 font-cyber">問題マスタを読み込み中...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 0-C. メディア全画面表示モーダル -->
+  <div id="media-fullscreen-modal" class="modal-overlay modal-media hidden">
+    <button type="button" class="btn-close-fullscreen" aria-label="閉じる" onclick="AppUI.closeMediaFullscreen()">
+      <span class="material-symbols-outlined icon-lg">close</span>
+    </button>
+    <div id="fullscreen-media-content" class="fullscreen-media-wrapper"></div>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- 1. 端末役割 選択画面                                                   -->
+  <!-- ====================================================================== -->
+  <div id="role-select-screen" class="screen-container hidden">
+    <div class="card select-card cyber-border">
+      <div class="system-title-badge font-cyber">PROJECT AI // NODE ROLE SELECT</div>
+      <h1 class="title font-cyber">端末役割の選択</h1>
+      <p class="subtitle">この端末で使用するシステムを選択してください。</p>
+
+      <div class="role-button-group">
+        <button type="button" class="btn btn-role btn-role-staff" onclick="AppEngine.selectRole('staff')">
+          <span class="material-symbols-outlined role-icon icon-gold">smartphone</span>
+          <div>
+            <span class="role-title">付き添いスタッフ機 [STAFF MOBILE]</span>
+            <span class="role-desc">スマホ専用: QRコード発行・提示 & 解答カンニング確認</span>
+          </div>
+        </button>
+
+        <button type="button" class="btn btn-role" onclick="AppEngine.selectRole('entry')">
+          <span class="material-symbols-outlined role-icon">login</span>
+          <div>
+            <span class="role-title">入口機 [GATEWAY // MONITOR]</span>
+            <span class="role-desc">QRスキャン受付 & 全ブース稼働監視・作戦プロトコル確認</span>
+          </div>
+        </button>
+
+        <button type="button" class="btn btn-role btn-role-manager" onclick="AppEngine.selectRole('manager')">
+          <span class="material-symbols-outlined role-icon icon-warning">admin_panel_settings</span>
+          <div>
+            <span class="role-title">管理者機 [MASTER CONTROL // BACKYARD]</span>
+            <span class="role-desc">バックヤード統括: 稼働監視・制限時間/誤答ルール/EX条件設定</span>
+          </div>
+        </button>
+
+        <button type="button" class="btn btn-role" onclick="AppEngine.selectRole('room1')">
+          <span class="material-symbols-outlined role-icon">looks_one</span>
+          <div>
+            <span class="role-title">第1問 ブース [NODE 1 : ALPHA]</span>
+            <span class="role-desc">QRスキャン即時出題・タイマー・⭕❌正誤判定</span>
+          </div>
+        </button>
+
+        <button type="button" class="btn btn-role" onclick="AppEngine.selectRole('room2')">
+          <span class="material-symbols-outlined role-icon">looks_two</span>
+          <div>
+            <span class="role-title">第2問 ブース [NODE 2 : BETA]</span>
+            <span class="role-desc">QRスキャン即時出題・タイマー・⭕❌正誤判定</span>
+          </div>
+        </button>
+
+        <button type="button" class="btn btn-role" onclick="AppEngine.selectRole('room3')">
+          <span class="material-symbols-outlined role-icon">looks_3</span>
+          <div>
+            <span class="role-title">第3問 ブース [NODE 3 : CORE]</span>
+            <span class="role-desc">QRスキャン即時出題・タイマー・⭕❌正誤判定</span>
+          </div>
+        </button>
+
+        <button type="button" class="btn btn-role" onclick="AppEngine.selectRole('shooting')">
+          <span class="material-symbols-outlined role-icon icon-danger">crisis_alert</span>
+          <div>
+            <span class="role-title">射撃フェーズ機 [SHOOTING RANGE]</span>
+            <span class="role-desc">テンキー得点入力 & QRスキャン得点記録</span>
+          </div>
+        </button>
+
+        <button type="button" class="btn btn-role" onclick="AppEngine.selectRole('exit')">
+          <span class="material-symbols-outlined role-icon icon-accent">sports_score</span>
+          <div>
+            <span class="role-title">出口 / リザルト機 [TERMINAL]</span>
+            <span class="role-desc">最終QRスキャン・新着/ハイスコア順結果一覧・EX判定・端末解除</span>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- 2. 付き添いスタッフスマホ画面 (#staff-screen)                          -->
+  <!-- ====================================================================== -->
+  <div id="staff-screen" class="screen-container staff-mobile-layout hidden">
+    <header class="mobile-header">
+      <div class="mobile-header-left">
+        <span class="badge badge-manager font-cyber">STAFF MOBILE</span>
+        <span id="staff-header-dev-id" class="font-mono text-muted">DEV: --</span>
+      </div>
+      <div class="mobile-header-right">
+        <button type="button" class="btn btn-manual btn-sm" onclick="ManualModal.open()" title="マニュアル">
+          <span class="material-symbols-outlined icon-sm">help</span>
+        </button>
+        <button type="button" class="btn btn-outline-danger btn-sm" onclick="AppEngine.resetRole()">
+          <span class="material-symbols-outlined icon-sm">settings</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- [View A] 設定入力画面 -->
+    <div id="staff-view-setup" class="staff-view">
+      <div class="card mobile-card cyber-border">
+        <div class="cyber-glitch-badge">GROUP INITIAL SETUP</div>
+        <h2 class="mobile-title font-cyber">新規グループ登録</h2>
+        <p class="mobile-subtitle">担当するグループの情報を入力してください</p>
+
+        <form id="form-staff-setup" onsubmit="StaffApp.generateAndStart(event)">
+          <div class="form-group">
+            <label class="form-label font-cyber" for="staff-input-dev-id">端末識別ID (自動保持)</label>
+            <input type="text" id="staff-input-dev-id" class="form-input font-mono" readonly required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label font-cyber" for="staff-input-staff-name">担当スタッフ名</label>
+            <input type="text" id="staff-input-staff-name" class="form-input" placeholder="例: 山田" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label font-cyber" for="staff-input-group-name">グループ名</label>
+            <input type="text" id="staff-input-group-name" class="form-input" placeholder="例: チームサイバー" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label font-cyber">選択難易度 (標準)</label>
+            <div class="staff-diff-selector">
+              <button type="button" class="btn-diff-chip" data-diff="easy" onclick="StaffApp.selectDiff('easy', this)">▲ EASY</button>
+              <button type="button" class="btn-diff-chip active" data-diff="normal" onclick="StaffApp.selectDiff('normal', this)">■ NORMAL</button>
+              <button type="button" class="btn-diff-chip" data-diff="hard" onclick="StaffApp.selectDiff('hard', this)">● HARD</button>
+              <button type="button" class="btn-diff-chip" data-diff="ex" onclick="StaffApp.selectDiff('ex', this)">★ EX</button>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-giant-mobile font-cyber">
+            <span class="material-symbols-outlined icon-md">qr_code</span> QRコードを発行する
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- [View B] 進行・QR提示 & 答えチートシート画面 -->
+    <div id="staff-view-active" class="staff-view hidden">
+      <!-- QRコード提示カード -->
+      <div class="card mobile-qr-card cyber-border-accent text-center">
+        <div class="active-group-head">
+          <span class="badge badge-admin font-mono" id="staff-active-dev-badge">DEV-01</span>
+          <span class="active-diff-badge font-cyber" id="staff-active-diff-badge">NORMAL</span>
+        </div>
+        
+        <h2 class="active-group-name" id="staff-active-group-name">--</h2>
+        <p class="active-staff-name text-muted" id="staff-active-staff-name">担当: --</p>
+
+        <div class="staff-qr-box">
+          <div id="staff-qrcode-container" class="qrcode-wrapper"></div>
+        </div>
+        <p class="staff-qr-guide">各ブースのiPadインカメラにかざしてください</p>
+      </div>
+
+      <!-- 答え確認チートシート (トグル開閉) -->
+      <div class="card cheat-sheet-card cyber-border">
+        <div class="cheat-sheet-header">
+          <div class="cheat-title-box">
+            <span class="material-symbols-outlined icon-md icon-gold">visibility</span>
+            <h3 class="cheat-title font-cyber">問題解答チートシート</h3>
+          </div>
+          <button type="button" id="btn-toggle-cheats" class="btn btn-secondary btn-sm font-cyber" onclick="StaffApp.toggleCheatsVisibility()">
+            <span class="material-symbols-outlined icon-xs">lock_open</span> <span id="cheat-toggle-label">答えを表示</span>
+          </button>
+        </div>
+
+        <div id="cheat-sheet-body" class="cheat-sheet-body hidden">
+          <div class="cheat-room-block">
+            <h4 class="cheat-room-title font-cyber">【第1問 ブース】模範解答</h4>
+            <div id="cheat-list-room1" class="cheat-item-list">読み込み中...</div>
+          </div>
+          <div class="cheat-room-block">
+            <h4 class="cheat-room-title font-cyber">【第2問 ブース】模範解答</h4>
+            <div id="cheat-list-room2" class="cheat-item-list">読み込み中...</div>
+          </div>
+          <div class="cheat-room-block">
+            <h4 class="cheat-room-title font-cyber">【第3問 ブース】模範解答</h4>
+            <div id="cheat-list-room3" class="cheat-item-list">読み込み中...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 次グループへリセットボタン -->
+      <div class="text-center py-3">
+        <button type="button" class="btn btn-danger btn-giant-mobile font-cyber" onclick="StaffApp.finishAndReset()">
+          <span class="material-symbols-outlined icon-md">restart_alt</span> グループ案内終了（次グループへ）
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- 3. 管理者機 画面 (#manager-screen)                                     -->
+  <!-- ====================================================================== -->
+  <div id="manager-screen" class="screen-container hidden">
+    <header class="app-header">
+      <div class="header-left">
+        <span class="badge badge-manager font-cyber">
+          <span class="material-symbols-outlined icon-sm">admin_panel_settings</span> MASTER CONTROL // 管理者機
+        </span>
+        <span id="manager-sync-dot" class="sync-dot"></span>
+        <span id="manager-sync-text" class="font-mono text-muted" style="font-size:12px;">--:--:--</span>
+      </div>
+      <div class="header-right-actions">
+        <button type="button" class="btn btn-manual btn-sm font-cyber" onclick="ManualModal.open()">
+          <span class="material-symbols-outlined icon-sm">help</span> マニュアル
+        </button>
+        <button type="button" class="btn btn-outline-danger btn-sm" onclick="AppEngine.resetRole()">
+          <span class="material-symbols-outlined icon-sm">settings</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- アラートバナー群 -->
+    <div id="manager-paused-banner" class="alert-banner alert-danger hidden font-cyber mb-3">
+      <span class="material-symbols-outlined">pause_circle</span> 全システム緊急一時停止中
+    </div>
+    <div id="manager-infopause-banner" class="alert-banner alert-warning hidden font-cyber mb-3">
+      <span class="material-symbols-outlined">hourglass_top</span> 「しばらくお待ちください」待機画面表示中
+    </div>
+    <div id="manager-exit-congested-box" class="alert-banner alert-warning hidden font-cyber mb-3">
+      <span class="material-symbols-outlined">warning</span> 出口混雑アラート発令中
+    </div>
+
+    <main class="manager-main-grid">
+      <!-- 左側: ルール一括設定カード -->
+      <section class="card cyber-border-accent">
+        <div class="section-header-flex">
+          <h2 class="section-title font-cyber">
+            <span class="material-symbols-outlined icon-sm icon-accent">tune</span> システム作戦プロトコル設定
+          </h2>
+        </div>
+
+        <form id="form-manager-rules" onsubmit="event.preventDefault(); ManagerApp.saveRules();">
+          <!-- 制限時間 -->
+          <div class="form-group">
+            <label class="form-label font-cyber" for="manager-time-limit-input">問題制限時間 (秒)</label>
+            <input type="number" id="manager-time-limit-input" class="form-input font-mono" min="10" max="300" value="60" required>
+            <span class="text-muted" style="font-size:11px;">※全問題ブース共通（推奨: 60秒）</span>
+          </div>
+
+          <!-- 誤答ペナルティルール -->
+          <div class="form-group">
+            <label class="form-label font-cyber" for="manager-penalty-rule-select">誤答判定ペナルティルール</label>
+            <select id="manager-penalty-rule-select" class="form-input font-cyber" onchange="ManagerApp.handlePenaltyRuleChange(this.value)">
+              <option value="instant_out">① 誤答即アウト (即座に不正解終了)</option>
+              <option value="time_deduct">② 時間減算ペナルティ (残り時間から減算)</option>
+            </select>
+          </div>
+
+          <!-- 時間減算秒数 -->
+          <div id="manager-deduct-seconds-group" class="form-group hidden">
+            <label class="form-label font-cyber" for="manager-deduct-seconds-input">誤答時の減算秒数 (秒)</label>
+            <input type="number" id="manager-deduct-seconds-input" class="form-input font-mono" min="5" max="60" value="15">
+          </div>
+
+          <!-- EX開放条件 -->
+          <div class="form-group">
+            <label class="form-label font-cyber" for="manager-ex-type-select">EXモード挑戦権の開放条件</label>
+            <select id="manager-ex-type-select" class="form-input font-cyber" onchange="ManagerApp.handleExTypeChange(this.value)">
+              <option value="hard_perfect">① HARD選択 かつ 全問正解 (標準)</option>
+              <option value="score_threshold">② 合計スコア〇〇点以上 (クイズ+射撃)</option>
+              <option value="diff_count">③ 指定難易度で△問以上正解</option>
+            </select>
+          </div>
+
+          <!-- EX設定値 -->
+          <div id="manager-ex-val-group" class="form-group hidden">
+            <label class="form-label font-cyber" id="manager-ex-val-label" for="manager-ex-val-input">EX条件設定値</label>
+            <input type="text" id="manager-ex-val-input" class="form-input font-mono" value="100">
+          </div>
+
+          <button type="submit" class="btn btn-primary font-cyber" style="width: 100%; min-height: 48px;">
+            <span class="material-symbols-outlined icon-sm">save</span> ルール設定を一括保存・適用
+          </button>
+        </form>
+
+        <hr style="border: 0; border-top: 1px solid rgba(0, 120, 215, 0.25); margin: 20px 0;">
+
+        <!-- 統括緊急制御ボタン -->
+        <h3 class="font-cyber" style="font-size: 14px; color: #94a3b8; margin-bottom: 10px;">バックヤード緊急制御</h3>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <button type="button" id="btn-emergency-pause" class="btn btn-danger btn-sm font-cyber" onclick="ManagerApp.toggleEmergencyPause()">
+            <span class="material-symbols-outlined icon-sm">pause_circle</span> 緊急一時停止
+          </button>
+          <button type="button" id="btn-info-pause" class="btn btn-warning btn-sm font-cyber" onclick="ManagerApp.toggleInfoPause()">
+            <span class="material-symbols-outlined icon-sm">hourglass_top</span> 「しばらくお待ちください」送信
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm font-cyber" onclick="ManagerApp.resetAllSystem()">
+            <span class="material-symbols-outlined icon-sm">restart_alt</span> システム初期化 (リセット)
+          </button>
+        </div>
+      </section>
+
+      <!-- 右側: 全ブース稼働状況モニタ -->
+      <section class="card cyber-border">
+        <div class="section-header-flex">
+          <h2 class="section-title font-cyber">全ブースリアルタイム稼働モニタ</h2>
+          <span class="section-note font-cyber">AUTO POLLING (3s)</span>
+        </div>
+
+        <div class="booth-status-simple-grid">
+          <div id="manager-booth-room1" class="simple-booth-card state-idle">
+            <div class="booth-info-left">
+              <span class="booth-tag font-cyber">第1問 [Alpha]</span>
+              <span class="booth-group-pill font-mono" id="manager-booth-group-room1">空室</span>
+            </div>
+            <div class="booth-state-indicator font-cyber" id="manager-booth-state-room1">空室 (IDLE)</div>
+          </div>
+
+          <div id="manager-booth-room2" class="simple-booth-card state-idle">
+            <div class="booth-info-left">
+              <span class="booth-tag font-cyber">第2問 [Beta]</span>
+              <span class="booth-group-pill font-mono" id="manager-booth-group-room2">空室</span>
+            </div>
+            <div class="booth-state-indicator font-cyber" id="manager-booth-state-room2">空室 (IDLE)</div>
+          </div>
+
+          <div id="manager-booth-room3" class="simple-booth-card state-idle">
+            <div class="booth-info-left">
+              <span class="booth-tag font-cyber">第3問 [Core]</span>
+              <span class="booth-group-pill font-mono" id="manager-booth-group-room3">空室</span>
+            </div>
+            <div class="booth-state-indicator font-cyber" id="manager-booth-state-room3">空室 (IDLE)</div>
+          </div>
+
+          <div id="manager-booth-shooting" class="simple-booth-card state-idle">
+            <div class="booth-info-left">
+              <span class="booth-tag font-cyber">射撃 [Shooting]</span>
+              <span class="booth-group-pill font-mono" id="manager-booth-group-shooting">空室</span>
+            </div>
+            <div class="booth-state-indicator font-cyber" id="manager-booth-state-shooting">空室 (IDLE)</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- 4. 入口機 画面 (#entry-screen)                                         -->
+  <!-- ====================================================================== -->
+  <div id="entry-screen" class="screen-container hidden">
+    <header class="app-header">
+      <div class="header-left">
+        <span class="badge badge-admin font-cyber">
+          <span class="material-symbols-outlined icon-sm">login</span> GATEWAY // 入口受付
+        </span>
+      </div>
+      <div class="header-right-actions">
+        <button type="button" class="btn btn-manual btn-sm font-cyber" onclick="ManualModal.open()">
+          <span class="material-symbols-outlined icon-sm">help</span> マニュアル
+        </button>
+        <button type="button" class="btn btn-outline-danger btn-sm" onclick="AppEngine.resetRole()">
+          <span class="material-symbols-outlined icon-sm">settings</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- 現在適用ルール確認情報バナーカード -->
+    <section class="card cyber-border-accent mb-4" style="padding: 14px 20px;">
+      <div class="section-header-flex mb-2">
+        <span class="font-cyber font-bold text-highlight" style="font-size: 13px; display: flex; align-items: center; gap: 6px;">
+          <span class="material-symbols-outlined icon-sm">info</span> 現在の作戦プロトコル (管理機設定)
+        </span>
+        <button type="button" class="btn btn-secondary btn-sm" style="min-height: 28px; padding: 2px 8px; font-size: 11px;" onclick="EntryApp.fetchCurrentRules()">
+          <span class="material-symbols-outlined icon-xs">refresh</span> 更新
+        </button>
+      </div>
+      <div class="entry-rules-summary-grid">
+        <div class="rule-chip-box">
+          <span class="rule-label text-muted">制限時間:</span>
+          <strong id="entry-rule-timelimit" class="rule-val font-mono text-highlight">60秒</strong>
+        </div>
+        <div class="rule-chip-box">
+          <span class="rule-label text-muted">誤答ルール:</span>
+          <strong id="entry-rule-penalty" class="rule-val font-cyber text-danger">誤答即アウト</strong>
+        </div>
+        <div class="rule-chip-box">
+          <span class="rule-label text-muted">EX開放条件:</span>
+          <strong id="entry-rule-ex" class="rule-val font-cyber text-warning">HARD全問正解</strong>
+        </div>
+      </div>
+    </section>
+
+    <main class="entry-main-grid">
+      <!-- 左側: QR受付アクションカード -->
+      <section class="entry-action-card card cyber-border-accent text-center">
+        <div class="entry-hero-icon">
+          <span class="material-symbols-outlined icon-hero icon-accent">how_to_reg</span>
+        </div>
+        <h2 class="entry-action-title font-cyber">グループ入場受付</h2>
+        <p class="entry-action-subtitle">スタッフスマホのQRコードをインカメラでスキャンして登録します</p>
+
+        <button type="button" class="btn btn-primary btn-giant-entry font-cyber" onclick="EntryApp.openRegisterScanner()">
+          <span class="material-symbols-outlined icon-lg">photo_camera</span> QRコードをスキャンしてグループ受付
+        </button>
+
+        <div id="entry-recent-registered" class="recent-registered-box hidden">
+          <span class="recent-label font-cyber">受付完了:</span>
+          <strong id="recent-group-id" class="font-mono text-success">--</strong>
+          <span id="recent-group-name" class="recent-name font-bold">--</span>
+          <span id="recent-diff-badge" class="badge badge-secondary font-cyber">--</span>
+        </div>
+      </section>
+
+      <!-- 右側: 各ブース稼働状況シンプルモニタ -->
+      <section class="entry-monitor-card card cyber-border">
+        <div class="section-header-flex">
+          <h2 class="section-title font-cyber">ブース稼働状況モニタ</h2>
+          <span class="section-note font-cyber">REALTIME PIPELINE</span>
+        </div>
+
+        <div class="booth-status-simple-grid">
+          <div id="booth-card-room1" class="simple-booth-card state-idle">
+            <div class="booth-info-left">
+              <span class="booth-tag font-cyber">第1問 [Alpha]</span>
+              <span class="booth-group-pill font-mono" id="booth-group-room1">空室</span>
+            </div>
+            <div class="booth-state-indicator font-cyber" id="booth-state-room1">空室 (IDLE)</div>
+          </div>
+
+          <div id="booth-card-room2" class="simple-booth-card state-idle">
+            <div class="booth-info-left">
+              <span class="booth-tag font-cyber">第2問 [Beta]</span>
+              <span class="booth-group-pill font-mono" id="booth-group-room2">空室</span>
+            </div>
+            <div class="booth-state-indicator font-cyber" id="booth-state-room2">空室 (IDLE)</div>
+          </div>
+
+          <div id="booth-card-room3" class="simple-booth-card state-idle">
+            <div class="booth-info-left">
+              <span class="booth-tag font-cyber">第3問 [Core]</span>
+              <span class="booth-group-pill font-mono" id="booth-group-room3">空室</span>
+            </div>
+            <div class="booth-state-indicator font-cyber" id="booth-state-room3">空室 (IDLE)</div>
+          </div>
+
+          <div id="booth-card-shooting" class="simple-booth-card state-idle">
+            <div class="booth-info-left">
+              <span class="booth-tag font-cyber">射撃 [Shooting]</span>
+              <span class="booth-group-pill font-mono" id="booth-group-shooting">空室</span>
+            </div>
+            <div class="booth-state-indicator font-cyber" id="booth-state-shooting">空室 (IDLE)</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- 5. 第1問〜第3問 ブース機 画面 (#quiz-screen)                          -->
+  <!-- ====================================================================== -->
+  <div id="quiz-screen" class="screen-container hidden">
+    <!-- 正解時演出レイヤー -->
+    <div id="effect-overlay-purged" class="effect-fullscreen-overlay effect-purged hidden">
+      <div class="effect-content">
+        <span class="material-symbols-outlined icon-hero icon-success">task_alt</span>
+        <h1 class="effect-title text-success font-cyber">SYSTEM PURGED</h1>
+        <p class="effect-subtitle font-cyber">防壁突破 // 承認プロトコル完了</p>
+      </div>
+    </div>
+
+    <!-- 不正解・時間切れ演出レイヤー -->
+    <div id="effect-overlay-breach" class="effect-fullscreen-overlay effect-breach hidden">
+      <div class="effect-content">
+        <span class="material-symbols-outlined icon-hero icon-danger">fmd_bad</span>
+        <h1 class="effect-title text-danger font-cyber">DEFENSE BREACHED</h1>
+        <p class="effect-subtitle font-cyber">防壁突破失敗 // 次のエリアへ進んでください</p>
+      </div>
+    </div>
+
+    <header class="quiz-header">
+      <div class="quiz-header-info">
+        <span id="quiz-room-badge" class="badge badge-quiz font-cyber">NODE 1 [ALPHA]</span>
+        <span id="quiz-group-badge" class="group-pill font-mono">GROUP: --</span>
+      </div>
+      <div class="header-right-actions">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="QuizApp.refreshQuestionsMaster()" title="問題マスタ手動更新">
+          <span class="material-symbols-outlined icon-sm">sync</span>
+        </button>
+        <button type="button" class="btn btn-manual btn-sm" onclick="ManualModal.open()">
+          <span class="material-symbols-outlined icon-sm">help</span>
+        </button>
+        <button type="button" class="btn btn-outline-danger btn-sm" onclick="AppEngine.resetRole()">
+          <span class="material-symbols-outlined icon-sm">settings</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- [View A] 待機時: QRスキャン起動ボタンのみのシンプル画面 -->
+    <div id="quiz-view-idle" class="quiz-view-container">
+      <div class="quiz-idle-wrapper card text-center cyber-border-accent">
+        <div class="glitch-icon-anim">
+          <span class="material-symbols-outlined icon-hero icon-accent">qr_code_scanner</span>
+        </div>
+        <h2 class="quiz-idle-title font-cyber">防壁アクセス待機中</h2>
+        <p class="quiz-idle-subtitle">お客様の準備が整ったら、下のボタンを押してスタッフスマホのQRコードをスキャンしてください</p>
+        
+        <button type="button" class="btn btn-primary btn-giant-auth font-cyber" onclick="QuizApp.openScanner()">
+          <span class="material-symbols-outlined icon-lg">photo_camera</span> QRコードをスキャンして開始
+        </button>
+      </div>
+    </div>
+
+    <!-- [View B] 攻略中 (Playing) -->
+    <div id="quiz-view-play" class="quiz-view-container hidden">
+      <div class="quiz-top-bar">
+        <div class="top-bar-left">
+          <div class="difficulty-tag font-cyber" id="quiz-diff-tag">NORMAL</div>
+        </div>
+        <div class="timer-container font-mono" id="quiz-timer-box">
+          <span class="material-symbols-outlined icon-sm">timer</span>
+          <span id="quiz-timer" class="timer-text">01:00</span>
+        </div>
+      </div>
+
+      <div class="card question-card cyber-border">
+        <div class="question-header">
+          <span class="question-id-badge font-mono" id="quiz-q-id">Q1-01</span>
+          <span class="media-zoom-hint text-muted"><span class="material-symbols-outlined icon-xs">zoom_in</span> タップで拡大</span>
+        </div>
+        <p class="question-text" id="quiz-question-text">問題文を読み込み中...</p>
+        <div id="quiz-media-container" class="question-media-container hidden"></div>
+      </div>
+
+      <div class="hint-section cyber-border-sub">
+        <div class="hint-header">
+          <h3 class="hint-heading font-cyber">
+            <span class="material-symbols-outlined icon-sm icon-gold">lightbulb</span> AI脆弱性解析ヒント
+          </h3>
+          <button type="button" id="btn-next-hint" class="btn btn-secondary btn-sm font-cyber" onclick="QuizApp.revealNextHint()">
+            <span class="material-symbols-outlined icon-sm">visibility</span> ヒント開示
+          </button>
+        </div>
+        <div id="quiz-hint-list" class="hint-list"></div>
+      </div>
+
+      <!-- スタッフ判定アクションバー (⭕と❌の2択のみ) -->
+      <div class="staff-action-bar-cyber-two">
+        <button type="button" class="btn btn-cyber-judge btn-cyber-wrong-huge font-cyber" onclick="QuizApp.handleJudge(false)" title="誤答判定">
+          <span class="material-symbols-outlined icon-xl">cancel</span>
+          <span>❌ 誤答</span>
+        </button>
+
+        <button type="button" class="btn btn-cyber-judge btn-cyber-correct-huge font-cyber" onclick="QuizApp.handleJudge(true)" title="正解・防壁突破">
+          <span class="material-symbols-outlined icon-xl">task_alt</span>
+          <span>⭕ 正解</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- 6. 射撃フェーズ機 画面 (#shooting-screen)                              -->
+  <!-- ====================================================================== -->
+  <div id="shooting-screen" class="screen-container hidden">
+    <header class="app-header">
+      <div class="header-left">
+        <span class="badge badge-exit font-cyber">
+          <span class="material-symbols-outlined icon-sm">crisis_alert</span> SHOOTING RANGE // 射撃フェーズ
+        </span>
+      </div>
+      <div class="header-right-actions">
+        <button type="button" class="btn btn-manual btn-sm" onclick="ManualModal.open()">
+          <span class="material-symbols-outlined icon-sm">help</span>
+        </button>
+        <button type="button" class="btn btn-outline-danger btn-sm" onclick="AppEngine.resetRole()">
+          <span class="material-symbols-outlined icon-sm">settings</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="shooting-main-layout">
+      <div class="card keypad-card shooting-card cyber-border-accent">
+        <div class="cyber-glitch-badge danger">BALLISTIC PROTOCOL</div>
+        <h2 class="keypad-title font-cyber text-center">射撃獲得スコア入力</h2>
+        <p class="keypad-guide text-center">的を倒して獲得した合計得点を入力してください</p>
+
+        <!-- スコア表示ボックス -->
+        <div class="shooting-score-display-box font-mono" id="shooting-score-display">0</div>
+
+        <!-- テンキーグリッド (連打画面拡大防止) -->
+        <div class="cyber-numpad-grid touch-action-manipulation">
+          <button type="button" class="btn-numpad font-mono" onclick="ShootingApp.pushKey('1')">1</button>
+          <button type="button" class="btn-numpad font-mono" onclick="ShootingApp.pushKey('2')">2</button>
+          <button type="button" class="btn-numpad font-mono" onclick="ShootingApp.pushKey('3')">3</button>
+          <button type="button" class="btn-numpad font-mono" onclick="ShootingApp.pushKey('4')">4</button>
+          <button type="button" class="btn-numpad font-mono" onclick="ShootingApp.pushKey('5')">5</button>
+          <button type="button" class="btn-numpad font-mono" onclick="ShootingApp.pushKey('6')">6</button>
+          <button type="button" class="btn-numpad font-mono" onclick="ShootingApp.pushKey('7')">7</button>
+          <button type="button" class="btn-numpad font-mono" onclick="ShootingApp.pushKey('8')">8</button>
+          <button type="button" class="btn-numpad font-mono" onclick="ShootingApp.pushKey('9')">9</button>
+          <button type="button" class="btn-numpad btn-numpad-clear font-cyber" onclick="ShootingApp.clear()">C</button>
+          <button type="button" class="btn-numpad font-mono" onclick="ShootingApp.pushKey('0')">0</button>
+          <button type="button" class="btn-numpad btn-numpad-bs font-cyber" onclick="ShootingApp.backspace()">
+            <span class="material-symbols-outlined">backspace</span>
+          </button>
+        </div>
+
+        <button type="button" class="btn btn-primary btn-submit-shooting font-cyber" onclick="ShootingApp.openScanner()">
+          <span class="material-symbols-outlined icon-md">photo_camera</span> QRコードをスキャンして得点登録
+        </button>
+      </div>
+    </main>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- 7. 出口／リザルト機 画面 (#exit-screen)                                -->
+  <!-- ====================================================================== -->
+  <div id="exit-screen" class="screen-container hidden">
+    <header class="app-header">
+      <div class="header-left">
+        <span class="badge badge-exit font-cyber">
+          <span class="material-symbols-outlined icon-sm">sports_score</span> TERMINAL // 成績発表・全結果一覧
+        </span>
+      </div>
+      <div class="header-right-actions">
+        <button type="button" class="btn btn-manual btn-sm" onclick="ManualModal.open()">
+          <span class="material-symbols-outlined icon-sm">help</span> マニュアル
+        </button>
+        <button type="button" class="btn btn-outline-danger btn-sm" onclick="AppEngine.resetRole()">
+          <span class="material-symbols-outlined icon-sm">settings</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- トップアクション: QRスキャンで成績発表 -->
+    <section class="card cyber-border-accent text-center mb-4" style="padding: 24px;">
+      <h2 class="font-cyber font-bold" style="font-size: 22px; color: #fff; margin-bottom: 6px;">
+        お客様のスマホQRコードをスキャン
+      </h2>
+      <p class="text-muted font-cyber mb-3" style="font-size: 13px;">
+        スキャンすると即座に成績が集計され、先頭に発表されます（スマホ紐付けは自動解除されます）
+      </p>
+      <button type="button" class="btn btn-primary btn-giant-entry font-cyber" style="margin: 0 auto; max-width: 480px;" onclick="ExitApp.openScanner()">
+        <span class="material-symbols-outlined icon-lg">photo_camera</span> QRコードをスキャンして成績発表
+      </button>
+    </section>
+
+    <!-- 結果一覧コントロールヘッダー -->
+    <div class="exit-results-control-bar">
+      <div class="control-bar-left">
+        <h3 class="font-cyber font-bold" style="font-size: 18px; color: #cbd5e1; display: flex; align-items: center; gap: 8px;">
+          <span class="material-symbols-outlined icon-md text-highlight">list_alt</span> 全グループ成績一覧
+          <span id="exit-total-groups-count" class="badge badge-secondary font-mono">0 組</span>
+        </h3>
+      </div>
+      <div class="control-bar-right">
+        <!-- 新着順 / ハイスコア順 ワンタップ切替タブ -->
+        <div class="sort-tabs-container">
+          <button type="button" id="btn-sort-latest" class="btn-sort-tab active font-cyber" onclick="ExitApp.switchSort('latest')">
+            <span class="material-symbols-outlined icon-xs">schedule</span> 新着順
+          </button>
+          <button type="button" id="btn-sort-score" class="btn-sort-tab font-cyber" onclick="ExitApp.switchSort('score')">
+            <span class="material-symbols-outlined icon-xs">leaderboard</span> ハイスコア順
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 結果カード一覧コンテナ -->
+    <main id="exit-results-list-container" class="exit-results-cards-grid mt-3">
+      <div class="text-center text-muted py-5 font-cyber">成績データを読み込み中...</div>
+    </main>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- 8. JavaScript スクリプト読み込み                                        -->
+  <!-- ====================================================================== -->
+  <script src="js/config.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/camera.js"></script>
+  <script src="js/staff.js"></script>
+  <script src="js/manager.js"></script>
+  <script src="js/entry.js"></script>
+  <script src="js/quiz.js"></script>
+  <script src="js/shooting.js"></script>
+  <script src="js/exit.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
