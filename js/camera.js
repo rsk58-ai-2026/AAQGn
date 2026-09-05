@@ -1,11 +1,11 @@
 /**
  * PROJECT AI 〜人類最後のアップデートが始まる〜
- * js/camera.js - インカメラQRスキャナー共通制御マネージャー (安全フォールバック付き)
+ * js/camera.js - インカメラQRスキャナー共通制御マネージャー (安全フォールバック & 最適化版)
  */
 
 const CameraScanner = {
   html5QrCode: null,
-  currentFacingMode: 'user',
+  currentFacingMode: 'user', // 'user' (インカメラ) または 'environment' (アウトカメラ)
   activeCallback: null,
   isScanning: false,
 
@@ -15,7 +15,10 @@ const CameraScanner = {
     if (modal) modal.classList.remove('hidden');
 
     const viewport = document.getElementById('camera-reader-viewport');
-    if (viewport) viewport.innerHTML = '';
+    if (viewport) {
+      viewport.innerHTML = '';
+      this.syncMirrorClass(viewport);
+    }
 
     // html5-qrcode ライブラリが存在しない場合の即時手動フォールバック
     if (typeof Html5Qrcode === 'undefined') {
@@ -32,19 +35,33 @@ const CameraScanner = {
         this.html5QrCode = null;
       }
 
-      this.html5QrCode = new Html5Qrcode('camera-reader-viewport');
+      // ネイティブ BarcodeDetector API がサポートされていれば使用し、iOS/Androidで高精度スキャン
+      this.html5QrCode = new Html5Qrcode('camera-reader-viewport', {
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true
+        },
+        verbose: false
+      });
 
+      // スキャン領域（qrbox）の最適化
       const config = {
-        fps: 15,
+        fps: 20,
         qrbox: (viewfinderWidth, viewfinderHeight) => {
           const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          // ビューファインダー枠の約75%を検出ターゲット領域に設定
           const edge = Math.max(160, Math.floor(minEdge * 0.75));
           return { width: edge, height: edge };
         },
-        aspectRatio: 1.0
+        aspectRatio: 1.0,
+        disableFlip: false
       };
 
-      const cameraConfig = { facingMode: this.currentFacingMode };
+      // 解像度最適化制約 (720p目安)
+      const cameraConfig = {
+        facingMode: this.currentFacingMode,
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      };
 
       this.isScanning = true;
       await this.html5QrCode.start(
@@ -57,7 +74,33 @@ const CameraScanner = {
       );
     } catch (error) {
       console.warn('[CameraScanner] カメラ自動起動失敗:', error);
+      // 解像度制約なしでのフォールバック起動
+      try {
+        if (this.html5QrCode) {
+          await this.html5QrCode.start(
+            { facingMode: this.currentFacingMode },
+            { fps: 15, aspectRatio: 1.0 },
+            (decodedText) => this.handleDecodedText(decodedText),
+            () => {}
+          );
+          return;
+        }
+      } catch (fallbackErr) {
+        console.warn('[CameraScanner] フォールバックカメラ起動も失敗:', fallbackErr);
+      }
+
       this.promptManualEntry('カメラの起動に失敗しました（権限またはデバイス制限）。\nスタッフ端末のID（例: DEV-01）を入力してください:');
+    }
+  },
+
+  syncMirrorClass(viewportElem) {
+    const vp = viewportElem || document.getElementById('camera-reader-viewport');
+    if (vp) {
+      if (this.currentFacingMode === 'user') {
+        vp.classList.add('mirror-mode');
+      } else {
+        vp.classList.remove('mirror-mode');
+      }
     }
   },
 
@@ -90,7 +133,7 @@ const CameraScanner = {
 
     let text = String(raw).trim();
 
-    // Base64 パック
+    // Base64 パック形式
     if (text.startsWith('PROJAI:')) {
       try {
         const b64 = text.replace('PROJAI:', '');
@@ -106,7 +149,7 @@ const CameraScanner = {
       } catch (e) {}
     }
 
-    // JSON
+    // JSON 形式
     try {
       const obj = JSON.parse(text);
       if (obj && typeof obj === 'object') {
@@ -120,7 +163,7 @@ const CameraScanner = {
       }
     } catch (e) {}
 
-    // URLデコード後JSON
+    // URLエンコードされたJSON
     try {
       const decoded = decodeURIComponent(text);
       const obj = JSON.parse(decoded);
@@ -135,7 +178,7 @@ const CameraScanner = {
       }
     } catch (e) {}
 
-    // DEV-XX マッチ
+    // DEV-XX パターンマッチ
     const devMatch = text.match(/(DEV-\d+)/i);
     if (devMatch) {
       return {
