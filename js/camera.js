@@ -1,13 +1,14 @@
 /**
  * PROJECT AI 〜人類最後のアップデートが始まる〜
- * js/camera.js - インカメラQRスキャナー共通制御マネージャー (安全フォールバック & 難易度正規化強化版)
+ * js/camera.js - インカメラQRスキャナー共通制御マネージャー (DOM描画待機 & 多段フォールバック強化版)
  */
 
 const CameraScanner = {
   html5QrCode: null,
-  currentFacingMode: 'user',
+  currentFacingMode: 'user', // デフォルト: インカメラ
   activeCallback: null,
   isScanning: false,
+  targetContainerId: 'camera-reader-viewport',
 
   /**
    * 難易度文字列の安全な正規化
@@ -27,14 +28,32 @@ const CameraScanner = {
     const modal = document.getElementById('camera-scan-modal');
     if (modal) modal.classList.remove('hidden');
 
-    const viewport = document.getElementById('camera-reader-viewport');
-    if (viewport) viewport.innerHTML = '';
+    const viewport = document.getElementById(this.targetContainerId);
+    if (viewport) {
+      viewport.innerHTML = '';
+      if (this.currentFacingMode === 'user') {
+        viewport.classList.add('mirror-mode');
+      } else {
+        viewport.classList.remove('mirror-mode');
+      }
+    }
 
     if (typeof Html5Qrcode === 'undefined') {
       this.promptManualEntry('QRスキャナーライブラリが読み込めませんでした。\nスタッフ端末のIDを手入力してください:');
       return;
     }
 
+    // 【最重要】モーダルのDOMレンダリング（幅・高さ確定）を確実に待機
+    await new Promise(resolve => {
+      requestAnimationFrame(() => {
+        setTimeout(resolve, 120);
+      });
+    });
+
+    await this.initAndStartCamera();
+  },
+
+  async initAndStartCamera() {
     try {
       if (this.html5QrCode) {
         try {
@@ -44,31 +63,69 @@ const CameraScanner = {
         this.html5QrCode = null;
       }
 
-      this.html5QrCode = new Html5Qrcode('camera-reader-viewport');
-
-      const config = {
-        fps: 15,
-        qrbox: (viewfinderWidth, viewfinderHeight) => {
-          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-          const edge = Math.max(160, Math.floor(minEdge * 0.75));
-          return { width: edge, height: edge };
+      this.html5QrCode = new Html5Qrcode(this.targetContainerId, {
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true
         },
-        aspectRatio: 1.0
+        verbose: false
+      });
+
+      const qrConfig = {
+        fps: 20,
+        qrbox: { width: 200, height: 200 },
+        aspectRatio: 1.0,
+        disableFlip: false
       };
 
-      const cameraConfig = { facingMode: this.currentFacingMode };
-
       this.isScanning = true;
+
+      // 第1試行: facingMode で起動
+      try {
+        await this.html5QrCode.start(
+          { facingMode: this.currentFacingMode },
+          qrConfig,
+          (decodedText) => this.handleDecodedText(decodedText),
+          () => {}
+        );
+        return;
+      } catch (err1) {
+        console.warn('[CameraScanner] 第1試行(facingMode)失敗、deviceId取得を試行:', err1);
+      }
+
+      // 第2試行: デバイス一覧からカメラIDを特定して起動
+      try {
+        const devices = await Html5Qrcode.getCameras();
+        if (devices && devices.length > 0) {
+          let selectedDevice = devices[0];
+          if (this.currentFacingMode === 'user') {
+            const front = devices.find(d => /front|user|facetime/i.test(d.label));
+            if (front) selectedDevice = front;
+          } else {
+            const back = devices.find(d => /back|rear|environment/i.test(d.label));
+            if (back) selectedDevice = back;
+          }
+
+          await this.html5QrCode.start(
+            selectedDevice.id,
+            qrConfig,
+            (decodedText) => this.handleDecodedText(decodedText),
+            () => {}
+          );
+          return;
+        }
+      } catch (err2) {
+        console.warn('[CameraScanner] 第2試行(deviceId)失敗、制約解除を試行:', err2);
+      }
+
+      // 第3試行: 最低限の制約で起動
       await this.html5QrCode.start(
-        cameraConfig,
-        config,
-        (decodedText) => {
-          this.handleDecodedText(decodedText);
-        },
+        { video: true },
+        { fps: 15, aspectRatio: 1.0 },
+        (decodedText) => this.handleDecodedText(decodedText),
         () => {}
       );
-    } catch (error) {
-      console.warn('[CameraScanner] カメラ自動起動失敗:', error);
+    } catch (finalError) {
+      console.error('[CameraScanner] 全カメラ起動試行失敗:', finalError);
       this.promptManualEntry('カメラの起動に失敗しました（権限またはデバイス制限）。\nスタッフ端末のID（例: DEV-01）を入力してください:');
     }
   },
